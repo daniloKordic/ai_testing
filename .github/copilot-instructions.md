@@ -1,0 +1,8 @@
+- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+- [x] Clarify Project Requirements - Python project with venv
+- [ ] Scaffold the Project
+- [ ] Install Required Packages
+- [ ] Verify Project Setup
+- [ ] Create and Run Task
+- [ ] Launch the Project
+- [ ] Ensure Documentation is Complete

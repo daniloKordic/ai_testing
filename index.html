@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit & Vegetable Knowledge Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            height: 80vh;
+            overflow: hidden;
+        }
+
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .assistant .message-content {
+            background: #e0e0e0;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+        }
+
+        .loading span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: bounce 1.4s infinite;
+        }
+
+        .loading span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        .loading span:last-child {
+            width: auto;
+            height: auto;
+            background: none;
+            animation: none;
+            margin-left: 4px;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+            40% { opacity: 1; transform: translateY(-8px); }
+        }
+
+        .input-section {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            background: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sources-section {
+            width: 350px;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .sources-header {
+            background: #f5f5f5;
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .sources-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .source-document {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #555;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .source-document h3 {
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .source-document pre {
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .no-sources {
+            color: #999;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .chat-section {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .sources-section {
+                width: 100%;
+                max-height: 300px;
+                border-left: none;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+
+        .error-message {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .timestamp {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-section">
+            <div class="header">
+                <h1>🍎 Fruit and Vegetable Knowledge Chat</h1>
+                <p>Ask me anything about fruits and vegetables using Azure Search & OpenAI</p>
+            </div>
+            
+            <div class="messages-container" id="messagesContainer"></div>
+            
+            <div class="input-section">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Ask about fruits (e.g., 'What are the health benefits of blueberries?')"
+                        autocomplete="off"
+                    >
+                    <button id="sendButton" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sources-section">
+            <div class="sources-header">📚 Source Documents</div>
+            <div class="sources-container" id="sourcesContainer">
+                <div class="no-sources">No documents yet</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8002';
+        const messagesContainer = document.getElementById('messagesContainer');
+        const sourcesContainer = document.getElementById('sourcesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
+        let conversationHistory = [];
+
+        // Enable Enter key to send
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+
+            addMessageToDisplay('user', message);
+            conversationHistory.push({ role: 'user', content: message });
+
+            messageInput.value = '';
+
+            // Create placeholder for streaming response
+            const streamMessageId = `stream-${Math.random().toString(36)}`;
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = streamMessageId;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.id = `${streamMessageId}-content`;
+            contentDiv.textContent = '';
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+
+            try {
+                const response = await fetch(`${API_BASE}/chat/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: conversationHistory,
+                        search_query: message
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                let sources = [];
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n').filter(line => line.trim());
+
+                    for (const line of lines) {
+                        const data = JSON.parse(line);
+                        
+                        if (data.type === 'sources') {
+                            sources = data.data;
+                            displaySources(sources);
+                        } else if (data.type === 'content') {
+                            fullContent += data.data;
+                            contentDiv.textContent = fullContent;
+                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        } else if (data.type === 'done') {
+                            // Add timestamp
+                            const timestamp = document.createElement('div');
+                            timestamp.className = 'timestamp';
+                            timestamp.textContent = new Date().toLocaleTimeString();
+                            contentDiv.appendChild(timestamp);
+                        }
+                    }
+                }
+
+                conversationHistory.push({ role: 'assistant', content: fullContent });
+            } catch (error) {
+                contentDiv.textContent = `Error: ${error.message}`;
+                contentDiv.classList.add('error-message');
+                console.error('Chat error:', error);
+            } finally {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        function addMessageToDisplay(role, content, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `message-content ${isError ? 'error-message' : ''}`;
+            contentDiv.innerHTML = `
+                ${escapeHtml(content)}
+                <div class="timestamp">${new Date().toLocaleTimeString()}</div>
+            `;
+
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            
+            // Auto-scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showLoadingIndicator() {
+            const id = Math.random().toString(36);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = `loading-${id}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `
+                <div class="loading">
+                    <span></span><span></span><span></span>
+                    <span>Thinking...</span>
+                </div>
+            `;
+
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            return id;
+        }
+
+        function removeLoadingIndicator(id) {
+            const element = document.getElementById(`loading-${id}`);
+            if (element) element.remove();
+        }
+
+        function displaySources(documents) {
+            sourcesContainer.innerHTML = '';
+
+            if (!documents || documents.length === 0) {
+                sourcesContainer.innerHTML = '<div class="no-sources">No source documents</div>';
+                return;
+            }
+
+            documents.forEach((doc, index) => {
+                const sourceDiv = document.createElement('div');
+                sourceDiv.className = 'source-document';
+
+                if (typeof doc === 'string') {
+                    sourceDiv.innerHTML = `<h3>Document ${index + 1}</h3><p>${escapeHtml(doc)}</p>`;
+                } else if (typeof doc === 'object') {
+                    const docStr = JSON.stringify(doc, null, 2);
+                    sourceDiv.innerHTML = `
+                        <h3>Document ${index + 1}</h3>
+                        <pre>${escapeHtml(docStr)}</pre>
+                    `;
+                }
+
+                sourcesContainer.appendChild(sourceDiv);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Focus input on load
+        window.addEventListener('load', () => {
+            messageInput.focus();
+        });
+    </script>
+</body>
+</html>

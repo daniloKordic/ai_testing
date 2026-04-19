@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/__init__.py
+src/azure_openai_client.py
+src/azure_search_client.py
+src/config.py
+src/main.py
+src/models.py
+src/azure_search_chatgpt.egg-info/PKG-INFO
+src/azure_search_chatgpt.egg-info/SOURCES.txt
+src/azure_search_chatgpt.egg-info/dependency_links.txt
+src/azure_search_chatgpt.egg-info/requires.txt
+src/azure_search_chatgpt.egg-info/top_level.txt
