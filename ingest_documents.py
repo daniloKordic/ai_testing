@@ -74,7 +74,8 @@ def ingest_documents(documents_dir: str = "documents"):
     except Exception as e:
         print(f"\n✗ Error uploading documents: {e}")
 
-
+# To run the ingestion script from sample_project directory:
+# .venv\Scripts\python.exe ingest_documents.py  
 if __name__ == "__main__":
     print("Azure Search Document Ingestion Script")
     print("=" * 40)
