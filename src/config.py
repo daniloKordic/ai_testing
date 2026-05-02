@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     max_tokens: int = 1000
-    temperature: float = 0.7
+    temperature: float = 0.1
 
     class Config:
         """Config for settings."""

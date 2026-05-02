@@ -94,6 +94,7 @@
             border-radius: 12px;
             word-wrap: break-word;
             line-height: 1.4;
+            white-space: pre-wrap;
         }
 
         .user .message-content {
@@ -286,13 +287,30 @@
             opacity: 0.7;
             margin-top: 4px;
         }
+
+        .message-content ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .message-content li {
+            margin-bottom: 4px;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="chat-section">
             <div class="header">
                 <h1>🍎 Fruit and Vegetable Knowledge Chat</h1>
+                <!-- Add this in the header section, after the h1 -->
+                <div style="margin-top: 10px;">
+                    <label style="color: white; font-size: 12px;">
+                        <input type="checkbox" id="streamingToggle" checked>
+                        Streaming Mode
+                    </label>
+                </div>
                 <p>Ask me anything about fruits and vegetables using Azure Search & OpenAI</p>
             </div>
             
@@ -345,10 +363,50 @@
 
             addMessageToDisplay('user', message);
             conversationHistory.push({ role: 'user', content: message });
-
             messageInput.value = '';
 
-            // Create placeholder for streaming response
+            const isStreaming = document.getElementById('streamingToggle').checked;
+            
+            try {
+                if (isStreaming) {
+                    await sendMessageStreaming(message);
+                } else {
+                    await sendMessageNonStreaming(message);
+                }
+            } catch (error) {
+                addMessageToDisplay('assistant', `Error: ${error.message}`, true);
+                console.error('Chat error:', error);
+            } finally {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        async function sendMessageNonStreaming(message) {
+            const response = await fetch(`${API_BASE}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: conversationHistory,
+                    search_query: message
+                })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            addMessageToDisplay('assistant', data.response);
+            conversationHistory.push({ role: 'assistant', content: data.response });
+
+            if (data.source_documents) {
+                displaySources(data.source_documents);
+            }
+        }
+
+        async function sendMessageStreaming(message) {
+            const loadingId = showLoadingIndicator(); // show spinner
+
             const streamMessageId = `stream-${Math.random().toString(36)}`;
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
@@ -356,7 +414,7 @@
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             contentDiv.id = `${streamMessageId}-content`;
-            contentDiv.textContent = '';
+            contentDiv.textContent = 'Receiving response...';
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
 
@@ -375,45 +433,66 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullContent = '';
-                let sources = [];
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n').filter(line => line.trim());
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
-                        const data = JSON.parse(line);
-                        
-                        if (data.type === 'sources') {
-                            sources = data.data;
-                            displaySources(sources);
-                        } else if (data.type === 'content') {
-                            fullContent += data.data;
-                            contentDiv.textContent = fullContent;
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                        } else if (data.type === 'done') {
-                            // Add timestamp
-                            const timestamp = document.createElement('div');
-                            timestamp.className = 'timestamp';
-                            timestamp.textContent = new Date().toLocaleTimeString();
-                            contentDiv.appendChild(timestamp);
+                        if (!line.trim()) continue;
+
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'sources') {
+                                displaySources(data.data);
+                            } else if (data.type === 'content') {
+                                fullContent += data.data;
+                                contentDiv.textContent = fullContent;
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse line:', line, e);
                         }
                     }
                 }
 
+                const timestamp = document.createElement('div');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = new Date().toLocaleTimeString();
+                contentDiv.appendChild(timestamp);
                 conversationHistory.push({ role: 'assistant', content: fullContent });
             } catch (error) {
                 contentDiv.textContent = `Error: ${error.message}`;
                 contentDiv.classList.add('error-message');
                 console.error('Chat error:', error);
             } finally {
+                removeLoadingIndicator(loadingId); // hide spinner
                 messageInput.disabled = false;
                 sendButton.disabled = false;
                 messageInput.focus();
             }
+        }
+
+        function renderAssistantHtml(content) {
+            const escaped = escapeHtml(content);
+
+            // Simple bullet list support
+            let html = escaped
+                .replace(/^\s*[-*+]\s+(.*)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+
+            // Preserve paragraph breaks
+            html = html
+                .replace(/\r\n/g, '\n')
+                .replace(/\n{2,}/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+
+            return `<p>${html}</p>`;
         }
 
         function addMessageToDisplay(role, content, isError = false) {
@@ -422,10 +501,19 @@
 
             const contentDiv = document.createElement('div');
             contentDiv.className = `message-content ${isError ? 'error-message' : ''}`;
-            contentDiv.innerHTML = `
-                ${escapeHtml(content)}
-                <div class="timestamp">${new Date().toLocaleTimeString()}</div>
-            `;
+
+            if (role === 'assistant') {
+                contentDiv.innerHTML = marked.parse(`
+                    ${content}
+                    <div class="timestamp">${new Date().toLocaleTimeString()}</div>
+                `);
+            }
+            else {
+                contentDiv.innerHTML = `
+                    ${renderAssistantHtml(content)}
+                    <div class="timestamp">${new Date().toLocaleTimeString()}</div>
+                `;
+            }
 
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
@@ -473,15 +561,17 @@
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'source-document';
 
-                if (typeof doc === 'string') {
-                    sourceDiv.innerHTML = `<h3>Document ${index + 1}</h3><p>${escapeHtml(doc)}</p>`;
-                } else if (typeof doc === 'object') {
-                    const docStr = JSON.stringify(doc, null, 2);
-                    sourceDiv.innerHTML = `
-                        <h3>Document ${index + 1}</h3>
-                        <pre>${escapeHtml(docStr)}</pre>
-                    `;
-                }
+                const title = doc.title || doc.filename || doc.name || doc.metadata_storage_name || `Document ${index + 1}`;
+                const path = doc.path || doc.file_path || doc.metadata_storage_path || doc.url || null;
+
+                const pathHtml = path
+                    ? `<p><a href="${escapeHtml(path)}" target="_blank" rel="noopener noreferrer">${escapeHtml(path)}</a></p>`
+                    : '';
+
+                sourceDiv.innerHTML = `
+                    <h3>${escapeHtml(title)}</h3>
+                    ${pathHtml}
+                `;
 
                 sourcesContainer.appendChild(sourceDiv);
             });

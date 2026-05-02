@@ -108,6 +108,15 @@ async def chat(request: ChatRequest):
                 # If it's a Pydantic model, convert to dict
                 doc_list.append(doc.model_dump() if hasattr(doc, 'model_dump') else doc.__dict__)
 
+        doc_refs = []
+        for doc in documents:
+            doc_dict = doc if isinstance(doc, dict) else (doc.model_dump() if hasattr(doc, 'model_dump') else doc.__dict__)
+            doc_refs.append({
+                "id": doc_dict.get("id") or doc_dict.get("document_id") or doc_dict.get("key"),
+                "title": doc_dict.get("title") or doc_dict.get("name") or doc_dict.get("filename") or doc_dict.get("metadata_storage_name"),
+                "path": doc_dict.get("file_path") or doc_dict.get("metadata_storage_path"),
+            })
+
         # Extract document content for context (limiting to first 3 for prompt)
         doc_contents = [str(doc) for doc in doc_list[:3]]
 
@@ -138,7 +147,7 @@ Answer questions based on this context. If the information is not in the documen
         
         return ChatResponse(
             response=response_text,
-            source_documents=doc_list,  # Return documents as list of dicts
+            source_documents=doc_refs,  # Return documents as list of dicts
         )
     except Exception as e:
         import traceback
@@ -162,6 +171,16 @@ async def chat_stream(request: ChatRequest):
                 doc_list.append(doc)
             else:
                 doc_list.append(doc.model_dump() if hasattr(doc, 'model_dump') else doc.__dict__)
+
+        doc_refs = []
+        for doc in documents:
+            doc_dict = doc if isinstance(doc, dict) else (doc.model_dump() if hasattr(doc, 'model_dump') else doc.__dict__)
+            logger.info(f"Document dict: {doc_dict}")
+            doc_refs.append({
+                "id": doc_dict.get("id") or doc_dict.get("document_id") or doc_dict.get("key"),
+                "title": doc_dict.get("title") or doc_dict.get("name") or doc_dict.get("filename") or doc_dict.get("metadata_storage_name"),
+                "path": doc_dict.get("file_path") or doc_dict.get("metadata_storage_path"),
+            })
         
         doc_contents = [str(doc) for doc in doc_list[:3]]
         
@@ -180,12 +199,25 @@ Answer questions based on this context. If the information is not in the documen
         # Create generator function
         async def generate():
             # Send initial metadata
-            yield json.dumps({"type": "sources", "data": doc_list}) + "\n"
+            yield json.dumps({"type": "sources", "data": doc_refs}) + "\n"
             
             # Stream the response
             openai = get_openai_client()
             for chunk in openai.get_chat_completion_stream(messages):
-                yield json.dumps({"type": "content", "data": chunk}) + "\n"
+                try:
+                    # Handle Azure OpenAI choice objects
+                    if hasattr(chunk, 'choices') and chunk.choices:
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, 'content') and delta.content:
+                            content = delta.content
+                            # Safely escape and encode
+                            yield json.dumps({"type": "content", "data": content}) + "\n"
+                    # Fallback for string chunks
+                    elif isinstance(chunk, str) and chunk.strip():
+                        yield json.dumps({"type": "content", "data": chunk}) + "\n"
+                except Exception as e:
+                    logger.error(f"Error processing chunk: {e}, chunk: {chunk}")
+                    continue
             
             # Send completion signal
             yield json.dumps({"type": "done"}) + "\n"
